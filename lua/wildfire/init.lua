@@ -1,7 +1,6 @@
 local api = vim.api
 
 local keymap = vim.keymap
-local ts_utils = require("nvim-treesitter.ts_utils")
 local parsers = require("nvim-treesitter.parsers")
 local utils = require("wildfire.utils")
 
@@ -102,7 +101,7 @@ local function init_by_node(node)
 end
 function M.init_selection()
     count = vim.v.count1
-    local node = ts_utils.get_node_at_cursor()
+    local node = vim.treesitter.get_node()
     if not node then
         return
     end
@@ -155,7 +154,9 @@ local function select_incremental(get_parent)
                 end
             end
             node = parent
-            local nsrow, nscol, nerow, necol = ts_utils.get_vim_range({ node:range() })
+            local nsrow, nscol, nerow, necol = vim.treesitter.get_node_range(node)
+            -- Convert 0-based to 1-based indexing to match vim coordinates
+            nsrow, nscol, nerow, necol = nsrow + 1, nscol + 1, nerow + 1, necol + 1
 
             local larger_range = utils.range_larger({ nsrow, nscol, nerow, necol }, { csrow, cscol, cerow, cecol })
 

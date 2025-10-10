@@ -1,6 +1,5 @@
 local api = vim.api
 
-local ts_utils = require("nvim-treesitter.ts_utils")
 local ts = vim.treesitter
 
 local M = {}
@@ -9,8 +8,12 @@ function M.get_range(node_or_range)
     if type(node_or_range) == "table" then
         start_row, start_col, end_row, end_col = unpack(node_or_range)
     else
-        local buf = api.nvim_get_current_buf()
-        start_row, start_col, end_row, end_col = ts_utils.get_vim_range({ ts.get_node_range(node_or_range) }, buf)
+        start_row, start_col, end_row, end_col = ts.get_node_range(node_or_range)
+        -- Convert 0-based to 1-based indexing to match vim coordinates
+        start_row = start_row + 1
+        start_col = start_col + 1
+        end_row = end_row + 1
+        end_col = end_col + 1
     end
     return start_row, start_col, end_row, end_col ---@type integer, integer, integer, integer
 end
@@ -63,15 +66,15 @@ end
 
 function M.print_selection(node_or_range)
     local bufnr = api.nvim_get_current_buf()
-    local lines
+    local node_text
     if type(node_or_range) == "table" then
         local srow, scol, erow, ecol
         srow, scol, erow, ecol = unpack(node_or_range)
-        lines = vim.api.nvim_buf_get_text(bufnr, srow - 1, scol - 1, erow - 1, ecol, {})
+        local lines = vim.api.nvim_buf_get_text(bufnr, srow - 1, scol - 1, erow - 1, ecol, {})
+        node_text = table.concat(lines, "\n")
     else
-        lines = ts_utils.get_node_text(node_or_range, bufnr)
+        node_text = vim.treesitter.get_node_text(node_or_range, bufnr)
     end
-    local node_text = table.concat(lines, "\n")
     print(node_text)
 end
 
@@ -81,7 +84,12 @@ function M.update_selection(buf, node_or_range, selection_mode)
     if type(node_or_range) == "table" then
         start_row, start_col, end_row, end_col = unpack(node_or_range)
     else
-        start_row, start_col, end_row, end_col = ts_utils.get_vim_range({ ts.get_node_range(node_or_range) }, buf)
+        start_row, start_col, end_row, end_col = ts.get_node_range(node_or_range)
+        -- Convert 0-based to 1-based indexing to match vim coordinates
+        start_row = start_row + 1
+        start_col = start_col + 1
+        end_row = end_row + 1
+        end_col = end_col + 1
     end
 
     local v_table = { charwise = "v", linewise = "V", blockwise = "<C-v>" }
