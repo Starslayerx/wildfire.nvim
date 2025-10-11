@@ -10,10 +10,12 @@ function M.get_range(node_or_range)
     else
         start_row, start_col, end_row, end_col = ts.get_node_range(node_or_range)
         -- Convert 0-based to 1-based indexing to match vim coordinates
+        -- Note: treesitter end_col is exclusive, but vim coordinates are inclusive
         start_row = start_row + 1
         start_col = start_col + 1
         end_row = end_row + 1
-        end_col = end_col + 1
+        -- end_col is already exclusive in treesitter (0-based), converting to 1-based inclusive means no change needed
+        -- because: 0-based exclusive position == 1-based inclusive position
     end
     return start_row, start_col, end_row, end_col ---@type integer, integer, integer, integer
 end
@@ -86,10 +88,12 @@ function M.update_selection(buf, node_or_range, selection_mode)
     else
         start_row, start_col, end_row, end_col = ts.get_node_range(node_or_range)
         -- Convert 0-based to 1-based indexing to match vim coordinates
+        -- Note: treesitter end_col is exclusive, but vim coordinates are inclusive
         start_row = start_row + 1
         start_col = start_col + 1
         end_row = end_row + 1
-        end_col = end_col + 1
+        -- end_col is already exclusive in treesitter (0-based), converting to 1-based inclusive means no change needed
+        -- because: 0-based exclusive position == 1-based inclusive position
     end
 
     local v_table = { charwise = "v", linewise = "V", blockwise = "<C-v>" }

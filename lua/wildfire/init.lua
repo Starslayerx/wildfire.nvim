@@ -156,7 +156,9 @@ local function select_incremental(get_parent)
             node = parent
             local nsrow, nscol, nerow, necol = vim.treesitter.get_node_range(node)
             -- Convert 0-based to 1-based indexing to match vim coordinates
-            nsrow, nscol, nerow, necol = nsrow + 1, nscol + 1, nerow + 1, necol + 1
+            -- Note: treesitter end_col is exclusive, but vim coordinates are inclusive
+            nsrow, nscol, nerow, necol = nsrow + 1, nscol + 1, nerow + 1, necol
+            -- necol: 0-based exclusive == 1-based inclusive, so no +1 needed
 
             local larger_range = utils.range_larger({ nsrow, nscol, nerow, necol }, { csrow, cscol, cerow, cecol })
 
