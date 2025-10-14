@@ -1,8 +1,6 @@
 local api = vim.api
 
 local keymap = vim.keymap
-local ts_utils = require("nvim-treesitter.ts_utils")
-local parsers = require("nvim-treesitter.parsers")
 local utils = require("wildfire.utils")
 
 local M = {}
@@ -30,7 +28,24 @@ local count = 1
 function M.unsurround_coordinates(node_or_range, buf)
     -- local lines = vim.split(s, "\n")
     local srow, scol, erow, ecol = utils.get_range(node_or_range)
-    local lines = vim.api.nvim_buf_get_text(buf, srow - 1, scol - 1, erow - 1, ecol, {})
+
+    -- Validate buffer bounds to prevent index out of bounds error
+    local line_count = vim.api.nvim_buf_line_count(buf)
+    if srow < 1 or erow > line_count or srow > erow then
+        return false, { srow, scol, erow, ecol }
+    end
+
+    -- Validate column bounds for the specific lines
+    if scol < 1 or ecol < 0 then
+        return false, { srow, scol, erow, ecol }
+    end
+
+    -- Use pcall to safely get text, handle any edge cases
+    local ok, lines = pcall(vim.api.nvim_buf_get_text, buf, srow - 1, scol - 1, erow - 1, ecol, {})
+    if not ok or not lines or #lines == 0 then
+        return false, { srow, scol, erow, ecol }
+    end
+
     local node_text = table.concat(lines, "\n")
     local match_brackets = nil
     for _, pair in ipairs(M.options.surrounds) do
@@ -102,8 +117,17 @@ local function init_by_node(node)
 end
 function M.init_selection()
     count = vim.v.count1
-    local node = ts_utils.get_node_at_cursor()
+    local node = vim.treesitter.get_node()
     if not node then
+        -- No treesitter node available, try to handle gracefully
+        -- Check if treesitter is available for this filetype
+        local buf = api.nvim_get_current_buf()
+        local ok, parser = pcall(vim.treesitter.get_parser, buf)
+        if not ok or not parser then
+            -- No parser available for this filetype
+            vim.notify("Wildfire: No treesitter parser available for this filetype", vim.log.levels.WARN)
+            return
+        end
         return
     end
     init_by_node(node)
@@ -134,9 +158,21 @@ local function select_incremental(get_parent)
 
         -- Initialize incremental selection with current selection
         if not nodes or #nodes == 0 then
-            local root = parsers.get_parser():parse()[1]:root()
+            -- Use native vim.treesitter API to get the parser
+            local ok, parser = pcall(vim.treesitter.get_parser, buf)
+            if not ok or not parser then
+                -- No parser available for this filetype, fallback to visual selection
+                return
+            end
+            local tree = parser:parse()[1]
+            if not tree then
+                return
+            end
+            local root = tree:root()
             local node = root:named_descendant_for_range(csrow - 1, cscol - 1, cerow - 1, cecol)
-            update_selection_by_node(node)
+            if node then
+                update_selection_by_node(node)
+            end
             return
         end
 
@@ -147,7 +183,17 @@ local function select_incremental(get_parent)
             if not parent or parent == node then
                 -- Keep searching in the main tree
                 -- TODO: we should search on the parent tree of the current node.
-                local root = parsers.get_parser():parse()[1]:root()
+                local ok, parser = pcall(vim.treesitter.get_parser, buf)
+                if not ok or not parser then
+                    utils.update_selection(buf, node)
+                    return
+                end
+                local tree = parser:parse()[1]
+                if not tree then
+                    utils.update_selection(buf, node)
+                    return
+                end
+                local root = tree:root()
                 parent = root:named_descendant_for_range(csrow - 1, cscol - 1, cerow - 1, cecol)
                 if not parent or root == node or parent == node then
                     utils.update_selection(buf, node)
@@ -155,7 +201,11 @@ local function select_incremental(get_parent)
                 end
             end
             node = parent
-            local nsrow, nscol, nerow, necol = ts_utils.get_vim_range({ node:range() })
+            local nsrow, nscol, nerow, necol = vim.treesitter.get_node_range(node)
+            -- Convert 0-based to 1-based indexing to match vim coordinates
+            -- Note: treesitter end_col is exclusive, but vim coordinates are inclusive
+            nsrow, nscol, nerow, necol = nsrow + 1, nscol + 1, nerow + 1, necol
+            -- necol: 0-based exclusive == 1-based inclusive, so no +1 needed
 
             local larger_range = utils.range_larger({ nsrow, nscol, nerow, necol }, { csrow, cscol, cerow, cecol })
 
