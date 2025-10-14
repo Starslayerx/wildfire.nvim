@@ -96,6 +96,29 @@ function M.update_selection(buf, node_or_range, selection_mode)
         -- because: 0-based exclusive position == 1-based inclusive position
     end
 
+    -- Validate buffer bounds to prevent cursor position errors
+    local line_count = api.nvim_buf_line_count(buf)
+    if start_row < 1 or end_row < 1 or start_row > line_count or end_row > line_count then
+        -- Invalid row range, cannot update selection
+        return
+    end
+
+    -- Validate column bounds
+    if start_col < 1 or end_col < 0 then
+        -- Invalid column range, cannot update selection
+        return
+    end
+
+    -- Get the actual line lengths to validate column positions
+    local start_line_text = api.nvim_buf_get_lines(buf, start_row - 1, start_row, false)[1] or ""
+    local end_line_text = api.nvim_buf_get_lines(buf, end_row - 1, end_row, false)[1] or ""
+    local start_line_len = #start_line_text
+    local end_line_len = #end_line_text
+
+    -- Clamp column positions to valid ranges (0-indexed for nvim_win_set_cursor)
+    start_col = math.max(0, math.min(start_col - 1, start_line_len))
+    end_col = math.max(0, math.min(end_col - 1, end_line_len))
+
     local v_table = { charwise = "v", linewise = "V", blockwise = "<C-v>" }
     selection_mode = selection_mode or "charwise"
 
@@ -115,8 +138,8 @@ function M.update_selection(buf, node_or_range, selection_mode)
         api.nvim_cmd({ cmd = "normal", bang = true, args = { selection_mode } }, {})
     end
 
-    api.nvim_win_set_cursor(0, { start_row, start_col - 1 })
+    api.nvim_win_set_cursor(0, { start_row, start_col })
     vim.cmd("normal! o")
-    api.nvim_win_set_cursor(0, { end_row, end_col - 1 })
+    api.nvim_win_set_cursor(0, { end_row, end_col })
 end
 return M
