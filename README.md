@@ -115,11 +115,15 @@ Beyond the basic actions such as yank(`CR`), delete(`d`), and change
 
 ## Installation
 
+Requires Neovim >= 0.9.0
+
 ``` lua
 {
     "sustech-data/wildfire.nvim",
     event = "VeryLazy",
-    dependencies = { "nvim-treesitter/nvim-treesitter" },
+    dependencies = {
+        { "nvim-treesitter/nvim-treesitter", branch = "main" }
+    },
     config = function()
         require("wildfire").setup()
     end,
